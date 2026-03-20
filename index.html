@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Finix Control</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="brand-mark">F</div>
+        <div>
+          <h1>Finix Control</h1>
+          <p>Vendas, recebimentos e estoque</p>
+        </div>
+      </div>
+
+      <nav class="nav-menu">
+        <button class="nav-item active" data-section="dashboard">Dashboard</button>
+        <button class="nav-item" data-section="vendas">Lançar venda</button>
+        <button class="nav-item" data-section="recebimentos">Recebimentos</button>
+        <button class="nav-item" data-section="estoque">Estoque</button>
+        <button class="nav-item" data-section="ocorrencias">Imprevistos</button>
+        <button class="nav-item" data-section="parcelas">Parcelas</button>
+      </nav>
+
+      <div class="sidebar-footer">
+        <small id="connectionStatus" class="status-chip offline">Modo demonstração</small>
+        <p>Conecte o Apps Script para salvar no Google Sheets.</p>
+      </div>
+    </aside>
+
+    <main class="main-content">
+      <header class="topbar">
+        <div>
+          <h2 id="sectionTitle">Dashboard</h2>
+          <p id="sectionSubtitle">Controle geral das suas vendas parceladas.</p>
+        </div>
+        <div class="topbar-actions">
+          <button id="refreshDataBtn" class="btn btn-secondary">Atualizar</button>
+        </div>
+      </header>
+
+      <section id="dashboard" class="section active">
+        <div class="cards-grid">
+          <article class="metric-card glow">
+            <span>Previsto no mês</span>
+            <strong id="previstoMes">R$ 0,00</strong>
+            <small>Soma das parcelas com vencimento no mês</small>
+          </article>
+          <article class="metric-card">
+            <span>Recebido no mês</span>
+            <strong id="recebidoMes">R$ 0,00</strong>
+            <small>Total já confirmado no mês atual</small>
+          </article>
+          <article class="metric-card">
+            <span>Pendente no mês</span>
+            <strong id="pendenteMes">R$ 0,00</strong>
+            <small>Previsto menos recebido</small>
+          </article>
+          <article class="metric-card danger">
+            <span>Em atraso</span>
+            <strong id="atrasadoMes">R$ 0,00</strong>
+            <small>Parcelas vencidas ainda abertas</small>
+          </article>
+        </div>
+
+        <div class="content-grid two-columns">
+          <article class="panel">
+            <div class="panel-head">
+              <h3>Projeção de recebimentos</h3>
+              <p>Entradas previstas x recebidas</p>
+            </div>
+            <canvas id="forecastChart"></canvas>
+          </article>
+
+          <article class="panel">
+            <div class="panel-head">
+              <h3>Próximos vencimentos</h3>
+              <p>Parcelas mais próximas</p>
+            </div>
+            <div id="upcomingList" class="list-stack empty-state-inline">Nenhuma parcela encontrada.</div>
+          </article>
+        </div>
+
+        <div class="content-grid two-columns">
+          <article class="panel">
+            <div class="panel-head">
+              <h3>Clientes com maior saldo</h3>
+              <p>Em aberto</p>
+            </div>
+            <div id="clientesSaldoList" class="list-stack empty-state-inline">Sem dados.</div>
+          </article>
+
+          <article class="panel">
+            <div class="panel-head">
+              <h3>Resumo operacional</h3>
+              <p>Indicadores rápidos</p>
+            </div>
+            <div class="summary-pills" id="quickSummary"></div>
+          </article>
+        </div>
+      </section>
+
+      <section id="vendas" class="section">
+        <div class="content-grid two-columns fixed-top">
+          <article class="panel">
+            <div class="panel-head">
+              <h3>Nova venda</h3>
+              <p>Celulares e acessórios, com ou sem entrada.</p>
+            </div>
+            <form id="saleForm" class="form-grid">
+              <div class="field full"><label>Cliente</label><input type="text" name="cliente" placeholder="Nome do cliente" required></div>
+              <div class="field"><label>Telefone</label><input type="text" name="telefone" placeholder="(88) 99999-9999"></div>
+              <div class="field"><label>Produto</label><input type="text" name="produto" placeholder="Ex.: iPhone 13 128GB" required></div>
+              <div class="field"><label>Categoria</label>
+                <select name="categoria">
+                  <option>Celular</option>
+                  <option>Acessório</option>
+                </select>
+              </div>
+              <div class="field"><label>Quantidade</label><input type="number" name="quantidade" min="1" value="1" required></div>
+              <div class="field"><label>Valor total</label><input type="number" step="0.01" name="valorTotal" required></div>
+              <div class="field"><label>Entrada</label><input type="number" step="0.01" name="entrada" value="0"></div>
+              <div class="field"><label>Parcelas</label><input type="number" name="parcelas" min="1" value="1" required></div>
+              <div class="field"><label>1º vencimento</label><input type="date" name="primeiroVencimento" required></div>
+              <div class="field"><label>Forma pag. entrada</label>
+                <select name="formaEntrada">
+                  <option>Dinheiro</option>
+                  <option>PIX</option>
+                  <option>Cartão</option>
+                  <option>Sem entrada</option>
+                </select>
+              </div>
+              <div class="field full"><label>Observações</label><textarea name="observacoes" rows="4" placeholder="Informações da venda, cor, IMEI, acordo com cliente..."></textarea></div>
+              <div class="field full form-actions"><button type="submit" class="btn btn-primary">Salvar venda</button></div>
+            </form>
+          </article>
+
+          <article class="panel">
+            <div class="panel-head">
+              <h3>Últimas vendas</h3>
+              <p>Histórico recente</p>
+            </div>
+            <div id="salesList" class="table-wrap"></div>
+          </article>
+        </div>
+      </section>
+
+      <section id="recebimentos" class="section">
+        <div class="content-grid two-columns fixed-top">
+          <article class="panel">
+            <div class="panel-head">
+              <h3>Lançar recebido</h3>
+              <p>Baixa total ou parcial de parcelas.</p>
+            </div>
+            <form id="receiptForm" class="form-grid">
+              <div class="field"><label>ID da parcela</label><input type="text" name="parcelaId" placeholder="Ex.: PAR-20260319-1" required></div>
+              <div class="field"><label>Cliente</label><input type="text" name="cliente" placeholder="Nome do cliente"></div>
+              <div class="field"><label>Valor recebido</label><input type="number" step="0.01" name="valorRecebido" required></div>
+              <div class="field"><label>Data</label><input type="date" name="dataRecebimento" required></div>
+              <div class="field"><label>Forma de pagamento</label>
+                <select name="formaPagamento">
+                  <option>PIX</option>
+                  <option>Dinheiro</option>
+                  <option>Cartão</option>
+                  <option>Transferência</option>
+                </select>
+              </div>
+              <div class="field"><label>Status</label>
+                <select name="status">
+                  <option>Recebido integral</option>
+                  <option>Recebido parcial</option>
+                  <option>Prometeu pagar</option>
+                  <option>Renegociado</option>
+                  <option>Atrasado</option>
+                </select>
+              </div>
+              <div class="field full"><label>Observação</label><textarea name="observacao" rows="4" placeholder="Ex.: cliente pagou metade, restante dia 15."></textarea></div>
+              <div class="field full form-actions"><button type="submit" class="btn btn-primary">Registrar recebimento</button></div>
+            </form>
+          </article>
+
+          <article class="panel">
+            <div class="panel-head">
+              <h3>Recebimentos recentes</h3>
+              <p>Últimos lançamentos</p>
+            </div>
+            <div id="receiptList" class="table-wrap"></div>
+          </article>
+        </div>
+      </section>
+
+      <section id="estoque" class="section">
+        <div class="content-grid two-columns fixed-top">
+          <article class="panel">
+            <div class="panel-head">
+              <h3>Entrada de mercadoria</h3>
+              <p>Cadastre celulares e acessórios no estoque.</p>
+            </div>
+            <form id="stockForm" class="form-grid">
+              <div class="field"><label>Produto</label><input type="text" name="produto" required></div>
+              <div class="field"><label>Categoria</label>
+                <select name="categoria">
+                  <option>Celular</option>
+                  <option>Acessório</option>
+                </select>
+              </div>
+              <div class="field"><label>Marca/Modelo</label><input type="text" name="modelo"></div>
+              <div class="field"><label>IMEI / Série</label><input type="text" name="imei"></div>
+              <div class="field"><label>Quantidade</label><input type="number" name="quantidade" min="1" value="1" required></div>
+              <div class="field"><label>Custo unitário</label><input type="number" step="0.01" name="custo"></div>
+              <div class="field"><label>Preço sugerido</label><input type="number" step="0.01" name="precoVenda"></div>
+              <div class="field"><label>Fornecedor</label><input type="text" name="fornecedor"></div>
+              <div class="field"><label>Data de entrada</label><input type="date" name="dataEntrada" required></div>
+              <div class="field full"><label>Observação</label><textarea name="observacao" rows="4"></textarea></div>
+              <div class="field full form-actions"><button type="submit" class="btn btn-primary">Adicionar ao estoque</button></div>
+            </form>
+          </article>
+
+          <article class="panel">
+            <div class="panel-head">
+              <h3>Estoque atual</h3>
+              <p>Itens disponíveis</p>
+            </div>
+            <div id="stockList" class="table-wrap"></div>
+          </article>
+        </div>
+      </section>
+
+      <section id="ocorrencias" class="section">
+        <div class="content-grid two-columns fixed-top">
+          <article class="panel">
+            <div class="panel-head">
+              <h3>Registrar imprevisto</h3>
+              <p>Histórico de cobranças e acordos.</p>
+            </div>
+            <form id="occurrenceForm" class="form-grid">
+              <div class="field"><label>Cliente</label><input type="text" name="cliente" required></div>
+              <div class="field"><label>ID da venda</label><input type="text" name="vendaId"></div>
+              <div class="field"><label>ID da parcela</label><input type="text" name="parcelaId"></div>
+              <div class="field"><label>Tipo</label>
+                <select name="tipo">
+                  <option>Promessa de pagamento</option>
+                  <option>Renegociação</option>
+                  <option>Não respondeu</option>
+                  <option>Desemprego</option>
+                  <option>Problema no produto</option>
+                  <option>Outro imprevisto</option>
+                </select>
+              </div>
+              <div class="field"><label>Próximo retorno</label><input type="date" name="proximoContato"></div>
+              <div class="field full"><label>Descrição</label><textarea name="descricao" rows="5" required></textarea></div>
+              <div class="field full form-actions"><button type="submit" class="btn btn-primary">Salvar ocorrência</button></div>
+            </form>
+          </article>
+
+          <article class="panel">
+            <div class="panel-head">
+              <h3>Ocorrências recentes</h3>
+              <p>Últimos imprevistos registrados</p>
+            </div>
+            <div id="occurrenceList" class="table-wrap"></div>
+          </article>
+        </div>
+      </section>
+
+      <section id="parcelas" class="section">
+        <article class="panel">
+          <div class="panel-head">
+            <h3>Parcelas</h3>
+            <p>Controle geral das cobranças</p>
+          </div>
+          <div id="parcelList" class="table-wrap"></div>
+        </article>
+      </section>
+    </main>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="config.example.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
